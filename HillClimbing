@@ -1,9 +1,45 @@
-Algorithm Hill_Climbing(problem)
-    current ← Generate_Initial_State(problem)
-    loop
-        neighbor ← Best_Successor(current)
-        if Value(neighbor) ≤ Value(current) then
-            return current
-        current ← neighbor
-    end loop
-End Algorithm
+import random
+
+def generate_random_state(N):
+    return [random.randint(0, N-1) for _ in range(N)]
+
+def calculate_cost(state):
+    attacks = 0
+    N = len(state)
+    for i in range(N):
+        for j in range(i + 1, N):
+            if state[i] == state[j] or abs(state[i] - state[j]) == abs(i - j):
+                attacks += 1
+    return attacks
+
+def get_neighbors(state):
+    neighbors = []
+    N = len(state)
+    for col in range(N):
+        for row in range(N):
+            if row != state[col]:
+                new_state = state.copy()
+                new_state[col] = row
+                neighbors.append(new_state)
+    return neighbors
+
+def hill_climbing(N):
+    current_state = generate_random_state(N)
+    current_cost = calculate_cost(current_state)
+
+    while True:
+        neighbors = get_neighbors(current_state)
+        neighbor_costs = [calculate_cost(n) for n in neighbors]
+        best_cost = min(neighbor_costs)
+        best_neighbor = neighbors[neighbor_costs.index(best_cost)]
+
+        if best_cost >= current_cost:
+            return current_state, current_cost
+
+        current_state = best_neighbor
+        current_cost = best_cost
+
+# Run for 4-Queens
+solution, cost = hill_climbing(4)
+print("Final State (Queen Positions):", solution)
+print("Final Cost (Number of Attacking Pairs):", cost)
