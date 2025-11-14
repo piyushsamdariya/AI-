@@ -1,0 +1,122 @@
+import re
+import itertools
+
+class KnowledgeBase:
+    def __init__(self):
+        self.facts = set()
+        self.rules = []
+
+    def add_fact(self, fact):
+        self.facts.add(fact)
+
+    def add_rule(self, rule):
+        # A rule is of the form (premises, conclusion)
+        self.rules.append(rule)
+
+    def forward_chain(self, query):
+        new_inferred = True
+
+        while new_inferred:
+            new_inferred = False
+            for premises, conclusion in self.rules:
+                # Try to find variable substitutions that satisfy all premises
+                all_bindings = self.find_bindings(premises)
+
+                for binding in all_bindings:
+                    # Apply substitution to the conclusion
+                    instantiated_conclusion = self.substitute(conclusion, binding)
+
+                    if instantiated_conclusion not in self.facts:
+                        print(f"Inferred new fact: {instantiated_conclusion}")
+                        self.facts.add(instantiated_conclusion)
+                        new_inferred = True
+                        if instantiated_conclusion == query:
+                            return True
+
+        return query in self.facts
+
+    def find_bindings(self, premises):
+        """
+        Try to find bindings (variable substitutions) for all premises that match facts.
+        """
+        all_bindings = [dict()]  # start with an empty binding set
+
+        for premise in premises:
+            new_bindings = []
+            for fact in self.facts:
+                for binding in all_bindings:
+                    new_binding = self.unify(premise, fact, binding.copy())
+                    if new_binding is not None:
+                        new_bindings.append(new_binding)
+            all_bindings = new_bindings
+
+        return all_bindings
+
+    def unify(self, pattern, fact, bindings):
+        """Attempt to unify pattern with fact given existing bindings."""
+        p_pred, p_args = self.parse_predicate(pattern)
+        f_pred, f_args = self.parse_predicate(fact)
+
+        if p_pred != f_pred or len(p_args) != len(f_args):
+            return None
+
+        for p_arg, f_arg in zip(p_args, f_args):
+            if self.is_variable(p_arg):
+                if p_arg in bindings:
+                    if bindings[p_arg] != f_arg:
+                        return None  # conflicting binding
+                else:
+                    bindings[p_arg] = f_arg
+            elif p_arg != f_arg:
+                return None
+
+        return bindings
+
+    def substitute(self, expr, bindings):
+        pred, args = self.parse_predicate(expr)
+        new_args = [bindings.get(a, a) for a in args]
+        return f"{pred}({', '.join(new_args)})"
+
+    def parse_predicate(self, expr):
+        match = re.match(r"(\w+)\((.*)\)", expr)
+        if not match:
+            return expr, []
+        pred = match.group(1)
+        args = [a.strip() for a in match.group(2).split(',')]
+        return pred, args
+
+    def is_variable(self, arg):
+        # convention: variables start with lowercase, constants with uppercase
+        return arg and arg[0].islower()
+
+
+# -------------------------------
+# Example Usage
+# -------------------------------
+if __name__ == "__main__":
+    kb = KnowledgeBase()
+
+    print("Enter facts (type 'done' to stop):")
+    while True:
+        fact = input("Fact: ").strip()
+        if fact.lower() == "done":
+            break
+        kb.add_fact(fact)
+
+    print("\nEnter rules (as comma-separated premises => conclusion), type 'done' to stop:")
+    while True:
+        rule_input = input("Rule: ").strip()
+        if rule_input.lower() == "done":
+            break
+        if "=>" in rule_input:
+            premises_str, conclusion = rule_input.split("=>")
+            premises = [p.strip() for p in premises_str.split(",")]
+            kb.add_rule((premises, conclusion.strip()))
+        else:
+            print("Invalid rule format! Use: premise1, premise2 => conclusion")
+
+    query = input("\nEnter the query to prove: ").strip()
+
+    print("\n--- Forward Chaining ---")
+    result = kb.forward_chain(query)
+    print(f"\nQuery '{query}' is {'PROVEN ✅' if result else 'NOT PROVEN ❌'}")
